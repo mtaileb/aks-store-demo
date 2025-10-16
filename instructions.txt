@@ -1,0 +1,64 @@
+# Nous allons ici déployer sur AKS l'application testée lors du TP2: DOCKER COMPOSE.
+
+# CREATION DU REGISTRE DE CONTENEURS:
+# Création du groupe de ressources:
+az group create --name myResourceGroup --location eastus
+# Pour afficher la liste des régions Azure: az account list-locations --output table
+# D'abord créer un registre ACR en ligne de commande comme indiqué ci-dessous:
+# Astuce: pour remplacer automatiquement $ACRNAME par le nom de votre registre dans la suite du code:
+ACRNAME='nomdemonregistre'
+az acr create --resource-group myResourceGroup --name $ACRNAME --sku Basic
+# Cloner le repo ci-dessous (si ce n'est déjà fait dans le TP2: DOCKER COMPOSE) puis se déplacer dans le répertoire téléchargé:
+git clone https://github.com/Azure-Samples/aks-store-demo.git && cd aks-store-demo
+# Build et push des images de l'application vers le registre ACR:
+az acr build --registry $ACRNAME --image aks-store-demo/product-service:latest ./src/product-service/
+az acr build --registry $ACRNAME --image aks-store-demo/order-service:latest ./src/order-service/
+az acr build --registry $ACRNAME --image aks-store-demo/store-front:latest ./src/store-front/
+# Vérification:
+az acr repository list --name $ACRNAME --output table
+
+# CREATON DU CLUSTER AKS:
+# Ensuite, créer le cluster AKS dans le même groupe de ressources que l'ACR créé:
+az aks create --resource-group myResourceGroup --name myAKSCluster --node-count 1  --enable-addons monitoring --generate-ssh-keys --attach-acr $ACRNAME
+# Puis on configure kubectl pour qu'il se connecte à notre cluster avec get-credentials:
+az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+# Vérifions la connexion du cluster aux noeuds:
+kubectl get nodes
+
+# MISE A JOUR DES URL DES IMAGES DANS LE MANIFESTE:
+# Afin de déployer l'application, nous avons besoin de récupérer le nom du serveur de login (nota: il est aussi possible de le récupérer via l'interface graphique en allant dans la ressource ACR):
+az acr list --resource-group myResourceGroup --query "[].{acrLoginServer:loginServer}" --output table
+# Aller dans le répertoire ask-store-demo où se trouve le manifeste K8s, et l'ouvrir avec nano ou vi:
+nano -l aks-store-quickstart.yaml
+# Remplacer dans les lignes 92, 179, et 238, la chaine de caractère 'ghcr.io/azure-samples' par votre ACR dans l'URL de l'image. Voici un extrait du code concerné:
+containers:
+...
+- name: order-service
+ image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
+...
+- name: product-service
+ image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
+...
+- name: store-front
+ image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
+...
+
+# DEPLOIEMENT DE L'APPLICATION:
+kubectl apply -f aks-store-quickstart.yaml
+# Vous devriez voir en output que chacun des services est déployé et créé.
+
+# TEST DE L'APPLICATION:
+# K8s expose l'application via l'URL publique au bout de quelques secondes ou minutes. Pour surveiller en temps réel sa disponibilité publique (Nota: --watch suspend le terminal):
+kubectl get service store-front --watch
+# Initialement l'affichage ressemblera à ceci (à noter l'état 'pending'):
+store-front   LoadBalancer   10.0.34.242   <pending>     80:30676/TCP   5s
+# Puis l'adresse IP finale devrait apparaitre à la place de 'pending':
+store-front   LoadBalancer   10.0.34.242   52.179.23.131   80:30676/TCP   67s
+# Faire Ctrl+C pour quitter le mode suspendu du terminal.
+# On peut visualiser les pods:
+kubectl get pods
+# Supprimez un des pods; puis réexécutez kubectl get pods:
+kubectl delete pods pod_name --grace-period=0 --force
+# Que s'est-il passé?
+
+# Ouvrir l'appli via l'adresse IP externe du cluster indiquée ci-haut (52.179.23.131 dans le présent exemple).
