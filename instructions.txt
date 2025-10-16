@@ -30,17 +30,17 @@ kubectl get nodes
 az acr list --resource-group myResourceGroup --query "[].{acrLoginServer:loginServer}" --output table
 # Aller dans le répertoire ask-store-demo où se trouve le manifeste K8s, et l'ouvrir avec nano ou vi:
 nano -l aks-store-quickstart.yaml
-# Remplacer dans les lignes 92, 179, et 238, la chaine de caractère 'ghcr.io/azure-samples' par 'mtaileb' (c'est mon dépot Docker Hub où j'ai déjà déposé toutes ces images). Voici un extrait du code concerné:
+# Remplacer les lignes 92, 179, et 238 comme suit:
 containers:
 ...
 - name: order-service
- image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
+ image: ghcr.io/azure-samples/aks-store-demo/order-service:latest A REMPLACER PAR: registry.hub.docker.com/mtaileb/aks-store-demo-order-service:latest
 ...
 - name: product-service
- image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
+ image: ghcr.io/azure-samples/aks-store-demo/product-service:latest A REMPLACER PAR: registry.hub.docker.com/mtaileb/aks-store-demo-product-service:latest
 ...
 - name: store-front
- image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
+ image: ghcr.io/azure-samples/aks-store-demo/store-front:latest A REMPLACER PAR: registry.hub.docker.com/mtaileb/aks-store-demo-store-front:latest
 ...
 
 # DEPLOIEMENT DE L'APPLICATION:
